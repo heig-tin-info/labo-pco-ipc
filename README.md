@@ -18,6 +18,8 @@ Il existe plusieurs mécanismes IPC :
 - Les signaux
 - Les sockets
 
+Notre objectif est de passer en revue ces différents mécanismes et de démystifier leur utilisation.
+
 ## Note sur la conformité POSIX
 
 La norme POSIX s'active en ajoutant la définition `_XOPEN_SOURCE` avant d'inclure les en-têtes. Par exemple :
@@ -28,20 +30,22 @@ gcc -std=c2x -D_XOPEN_SOURCE=700 program.c
 
 Certains mécanismes sont spécifiques à Linux et ne sont pas POSIX. Attention donc à la portabilité des exemples.
 
+Les systèmes BSD (FreeBSD, OpenBSD, NetBSD) sont conformes à POSIX de même que macOS. Certains anciens systèmes Unix (Solaris, AIX, HP-UX) l'étaient également. En outre Linux est un cas particulier car il n'hérite pas directement du code source d'Unix. Il a été réécrit de zéro en 1991 par Linus Torvalds. Face à la popularité de Linux certaines libertés ont été prises et Linux est dit "Unix-like" et non "Unix", il a une très grande compatibilité POSIX mais n'est pas 100% conforme et ajoute des fonctionnalités non-POSIX qui lui sont propres.
+
 ### Signaux
 
 Les signaux sont la forme la plus simple de communication inter-processus. Ils permettent à un processus d'envoyer une notification à un autre processus. Les signaux sont utilisés pour gérer les interruptions, les erreurs, les événements, etc. Ils ne transportent pas de données.
 
-Les fonctions et appels systèmes associés aux signaux sont :
+Les fonctions et appels systèmes associés aux signaux sont les suivantes. La documentation est accessible avec `man 2 <fonction>` :
 
 - `kill` : Envoie un signal à un processus.
-- `signal` : Associe une fonction de traitement à un signal.
+- `signal` : Associe une fonction de traitement à un signal *(obsolète)*
 - `sigaction` : Modifie l'action associée à un signal.
 - `sigprocmask` : Modifie le masque de signaux du processus.
 - `sigpending` : Récupère la liste des signaux en attente.
 - `sigwait` : Attend la réception d'un signal.
 
-Les signaux les plus connus sont :
+Les signaux les plus connus sont (accessible depuis `man 7 signal`) :
 
 - `SIGINT` : Interruption depuis le clavier (Ctrl+C)
 - `SIGKILL` : Tue un processus (Pas interceptable)
@@ -60,7 +64,7 @@ Il est courant de redéfinir le comportement d'un signal en utilisant la fonctio
 
 void handler(int signum) {
     printf("Goodbye!\n");
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 int main() {
@@ -72,53 +76,147 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    while (1) pause();
+    for (;;) pause();
 }
 ```
 
-Note: l'utilisation de `signal`, plus simple, est déconseillée car elle n'est pas portable.
+Notez qu'il est également possible d'accéder aux signaux en attente depuis `/proc`:
+
+```text
+cat /proc/3660502/status | grep Sig
+SigQ:   2/256994          # Signaux temps réel en attente
+SigPnd: 0000000000000000  # Nombre de signaux en attente
+SigBlk: 0000000000000000  # Signaux bloqués (masqués)
+SigIgn: 0000000000000000  # Signaux ignorés par le processus
+SigCgt: 0000000000010002  # Signaux capturés par le processus
+```
+
+Le kernel permet de modifier la limite des signaux en attentes avec `ulimit -i`.
+
+```text
+ulimit -q # Limite par défaut
+ulimit -q 200000 # Limite à 200000 signaux pour le shelle courant
+```
+
+#### Exercice
+
+Créer un programme en C qui capture `SIGINT`, `SIGUSR1` et `SIGUSR2` et qui ignore `SIGALRM`. Le programme doit afficher un message lors de la réception de chaque signal capturés.
+
+1. Essayez d'envoyer des signaux au processus
+2. Vérifier que l'état de `SigCgt` est correct avec votre configuration (utiliser `/proc` et l'aide de `man 7 signal`).
+3. Vérifiez que l'état de `SigIgn` est correct avec votre configuration.
+
+#### Quiz
+
+1. Quel est le signal envoyé par défaut avec `Ctrl+C` ?
+2. Quel est le signal envoyé par défaut avec `Ctrl+Z` ?
+3. Quel est le signal envoyé par défaut avec `kill` ?
+4. De combien de signaux utilisateurs un processus peut-il disposer ?
 
 ### Sémaphores
 
-Les sémaphores sont des objets de synchronisation qui permettent de contrôler l'accès à une ressource partagée. Ils sont utilisés pour résoudre les problèmes de concurrence entre processus. Ils ne transportent pas de données.
+Les sémaphores sont des objets de synchronisation qui permettent de contrôler l'accès à une ressource partagée. Ils sont utilisés pour résoudre les problèmes de concurrence entre processus et comme les signaux, ils ne transportent pas de données.
 
-Un sémaphore est un *compteur* qui est utilisé pour contrôler l'accès à une ressource partagée. Il est initialisé à une valeur donnée. Deux opérations sont possibles :
+Un sémaphore est basiquement un *compteur* qui s'incrément ou se *décrémente*  pour contrôler l'accès à une ressource partagée. Il démarre à une donnée et deux opérations sont possibles :
 
 - `P` (Proberen) : Attente. Si le sémaphore est positif, il est décrémenté. Sinon, le processus est mis en attente.
 - `V` (Verhogen) : Libération. Incrémente le sémaphore.
 
-Historiquement sous Unix (System V), les sémaphores étaient implémentés avec les appels systèmes `semget`, `semop` et `semctl`. Aujourd'hui, on utilise les sémaphores POSIX.
+Il faut voir le sémaphore comme un mécanisme de jetons pour accéder à des outils partagés. Si aucun jetons n'est disponible, vous attendez que quelqu'un ramène l'outil, et dépose le jeton qu'il a pris. Certains outils peuvent nécessiter plusieurs jetons pour être utilisés alors vous devez attendre que le nombre de jetons nécessaires soient disponibles.
 
-### Eventfd
+#### Sémaphores System V
 
-`eventfd` est un mécanisme de communication inter-processus qui permet à un processus de signaler un événement à un autre processus. Il est utilisé pour la communication entre processus sur une même machine.
+Historiquement sous Unix (System V), les sémaphores étaient implémentés avec les appels systèmes `semget`, `semop` et `semctl`. C'est un mécanisme simple, toujours supporté par POSIX mais qui n'est plus utilisé réelle.
+Aujourd'hui, on utilise les sémaphores dit POSIX qui sont une amélioration des sémaphores System V.
 
-### Signalfd
+Les fonctions associées aux sémaphores de System V sont :
 
-`signalfd` remplace `sigwait` et `sigaction`. Il permet de lire les signaux comme si c'était des fichiers. Cela permet de les traiter de manière asynchrone.
+- `semget` : Crée ou accède à un ensemble de sémaphores
+- `semop` : Modifie un ensemble de sémaphores
+- `semctl` : Contrôle un ensemble de sémaphores
 
+Notez que le kernel met à disposition l'état de ces sémaphores dans `/proc/sysvipc/sem` (*System V IPC / SEMaphores*).
+
+Pour tester cela écrire deux programmes :
+
+1. `verhogen.c` qui incrémente le sémaphore à la clé 1234.
+2. `proberen.c` qui attend qu'une ressource soit disponible sur le sémaphore 1234, puis décrémente le sémaphore et affiche un message.
+
+La première étape est de créer un ensemble de sémaphores avec `semget` :
+
+```c
+int semid = semget(1234, 1 /* Nombre de sémaphores */,
+    IPC_CREAT /* Créer si n'existe pas */
+    | 0666 /* Droits d'accès */);
+```
+
+Il faut s'assurer que `semid` est différent de `-1` pour vérifier que l'ensemble de sémaphores a bien été créé.
+
+Puis on peut incrémenter le sémaphore avec `semop` :
+
+```c
+semop(semid, &(struct sembuf){.sem_op = 1}, 1);
+```
+
+On selectionne le sémaphore 0, sans falgs et on incrémente le sémaphore de 1.
+
+Pour vérifier la valeur du sémaphore, on peut utiliser `semctl` :
+
+```c
+int value = semctl(semid, 0, GETVAL);
+```
+
+Si vous êtes bloqués, rendez-vous dans `sem/` pour voir la solution et la tester.
+
+#### Sémaphores POSIX
+
+Rendez-vous dans `man -L fr 7 sem_overview` pour voir la documentation des sémaphores POSIX. Profitez pour installer les manuels en français avec `sudo apt install manpages-fr`. Cela vous renseigne sur les différentes fonctions associées aux sémaphores POSIX :
+
+- `sem_open` : Crée ou ouvre un sémaphore
+- `sem_close` : Ferme un sémaphore
+- `sem_unlink` : Supprime un sémaphore
+- `sem_init` : Initialise un sémaphore
+- `sem_post` : Incrémente un sémaphore
+- `sem_wait` : Décrémente un sémaphore
+- `sem_getvalue` : Récupère la valeur d'un sémaphore
+
+Les sémaphores POSIX sont plus simples à utiliser que les sémaphores System V. Contrairement aux sémaphores System V qui possède une clé et qui sont partagés entre les processus, les sémaphores POSIX sont stockés dans le système de fichier dans `/dev/shm` et sont accessibles par tous les processus.
 
 ### Vérouillage de fichiers
 
 Deux processus peuvent exploiter un fichier en même temps leur permettant d'échanger de l'information. Le problème est que si un processus écrit dans le fichier, l'autre processus ne pourra pas lire l'information tant que le premier n'aura pas terminé d'écrire. Il y a donc un problème de synchronisation, et donc de concurrence.
 
-L'astuce est d'utiliser des fonctions de vérouillage de fichiers. Ces fonctions permettent de vérouiller un fichier pour qu'un seul processus puisse y accéder à la fois. Cela permet de synchroniser les accès au fichier.
+L'astuce est d'utiliser des fonctions de vérouillage de fichiers. Ces fonctions permettent de vérouiller un fichier pour qu'un seul processus puisse y accéder à la fois. Cela permet de synchroniser les accès.
+
+Ces opérations sont réalisées avec la fonction `fcntl` et les drapeaux `F_SETLKW`et `F_SETLK` :
 
 Imaginons deux processus :
 
 - Processus 1 : producteur de donnée, il écrit dans le fichier
 - Processus 2 : consommateur de donnée, il lit dans le fichier
 
-Un exemple est donné [ici](file-locking.c).
+Testez l'exemple donné [ici](file-locking.c).
 
-### Tuyau anonyme (*anonymous pipe*)
+### Tube/Tuyaux (*pipes*)
 
-Un tuyau anonyme est un mécanisme **uni-directionnel** de communication entre deux processus. Il est créé par un processus et partagé avec un autre processus. Il est utilisé pour la communication entre un processus père et un processus fils.
+Un tube est un mécanisme **uni-directionnel** de communication entre deux processus. Il est créé par un processus et partagé avec un autre processus. Il peut être notamment utilisé pour la communication entre un processus père et un processus fils.
+
+Chaque processus dispose de base de 3 flux de données :
+
+- `stdin` : Entrée standard
+- `stdout` : Sortie standard
+- `stderr` : Sortie d'erreur
+
+Note que vous pouvez accéder aux descripteurs de fichiers ouverts dans `/proc/<pid>/fd/`.
+
+#### Tuyau anonyme (*anonymous pipe*)
+
+Un tuyau anonyme comme son nom l'indique ne possède pas de nom. Il est volatile et ne peut être utilisé que par des processus qui partagent un ancêtre commun.
 
 Quand vous écrivez dans Bash :
 
 ```bash
-$ fortune | cowsay -d
+fortune | cowsay -d
 ```
 
 Ce qui se passe derrière c'est que `fortune` écrit dans un tuyau anonyme et `cowsay` lit dans ce tuyau.
@@ -160,6 +258,8 @@ int main() {
     }
 }
 ```
+
+L'appel système `dup2` prend un descripteur de fichier (numéro de fichier ouvert) et le remplace par un autre. Ici, on associe une extrémité du tube soit l'entrée standard (`STDIN_FILENO`) soit la sortie standard (`STDOUT_FILENO`) à l'identifiant de cette extrémité.
 
 ### Tuyau nommé (*named pipe*)
 
@@ -216,6 +316,16 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags);  // Envoyer de
 ssize_t recv(int sockfd, void *buf, size_t len, int flags);  // Recevoir des données
 int close(int sockfd);  // Fermer une socket
 ```
+
+### Eventfd
+
+`eventfd` est un mécanisme de communication inter-processus qui permet à un processus de signaler un événement à un autre processus. Il est utilisé pour la communication entre processus sur une même machine.
+
+### Signalfd
+
+`signalfd` remplace `sigwait` et `sigaction`. Il permet de lire les signaux comme si c'était des fichiers. Cela permet de les traiter de manière asynchrone.
+
+
 
 ## Appels systèmes
 

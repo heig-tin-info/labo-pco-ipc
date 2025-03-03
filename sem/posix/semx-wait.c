@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <semaphore.h>
 #include <fcntl.h>  // Pour O_CREAT
-#include <unistd.h>
 
 const char *SEM_NAME = "/sem";
 int main() {

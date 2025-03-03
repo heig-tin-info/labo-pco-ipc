@@ -1,14 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
-#include <fcntl.h>  // Pour O_CREAT
-#include <unistd.h>
-
-const char *SEM_NAME = "/sem";
 
 int main() {
-    // Ouvrir le sémaphore existant
-    sem_t *sem = sem_open(SEM_NAME, 0);
+    sem_t *sem = sem_open("/sem", 0);
     if (sem == SEM_FAILED) {
         perror("sem_open");
         exit(1);
