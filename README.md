@@ -4,6 +4,18 @@
 
 Comprendre les différents mécanismes de communication inter-processus (IPC) POSIX.
 
+## Exemples
+
+| IPC              | Chemin             |
+| ---------------- | ------------------ |
+| Messages         | [msg/](msg/)       |
+| Sémaphores       | [sem/](sem/)       |
+| Mémoire partagée | [shm/](shm/)       |
+| Tuyaux           | [pipe/](pipe/)     |
+| Sockets          | [socket/](socket/) |
+| Signaux          | [signal/](signal/) |
+
+
 ## IPC : Rappel de la définition
 
 Les mécanismes IPC (Inter-Process Communication) permettent à des processus de communiquer entre eux. Ils ont été normalisés par POSIX.1 en 1988.
@@ -289,16 +301,100 @@ Avec POSIX on a :
 
 ## Mémoire partagée
 
-Les processus sont étanches les uns des autres. Ils ne peuvent pas accéder à la mémoire des autres processus. Même un processus qui utilise `fork` ne peut pas accéder à la mémoire de son père. Cependant, il est possible de partager de la mémoire entre deux processus en utilisant la mémoire partagée. Les fonctions associées sont :
+Les processus sont étanches les uns des autres. Ils ne peuvent pas accéder à la mémoire des autres processus. Même un processus qui utilise `fork` ne peut pas accéder à la mémoire de son père. La preuve en code :
 
-Comment est-ce que cela fonctionne ?
+```c
+#include <stdio.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-1. Un processus crée un segment mémoire
-2. Il attache ce segment à son espace mémoire
-3. Un autre processus peut se connecter à ce segment
-4. Les deux processus peuvent alors écrire et lire dans ce segment
-5. Le segment est détaché de l'espace mémoire des processus
-6. Le segment est détruit
+int x = 42;
+
+int main() {
+    if (fork() == 0) {
+        x = 0;
+    } else {
+        wait(NULL);
+    }
+    printf("x = %d\n", x); // Affiche 0 puis 42... pourquoi ?
+}
+```
+
+Cependant, il est néanmoins possible de partager de la mémoire entre deux processus en utilisant la **mémoire partagée**.
+
+Comme pour les autres IPC que nous avons vu, il existe deux implémentations toujours dans le kernel, une héritée de System V (ancienne) et une POSIX (moderne). Les fonctions associées sont les suivantes :
+
+| Critère                 | System V               | POSIX                        |
+| ----------------------- | ---------------------- | ---------------------------- |
+| Création                | `shmget()`             | `shm_open()`                 |
+| Attachement             | `shmat()`              | `mmap()`                     |
+| Détachement             | `shmdt()`              | `munmap()`                   |
+| Suppression             | `shmctl(IPC_RMID)`     | `shm_unlink()`               |
+| Visibilité              | `ipcs -m`              | Fichiers dans `/dev/shm`     |
+| Stockage                | Géré par le noyau      | Fichier en mémoire (`tmpfs`) |
+| Simplicité              | Plus complexe          | Plus moderne et simple       |
+| Utilisation recommandée | Applications anciennes | Applications modernes        |
+
+### Mmap
+
+Dans la variante moderne, l'appel système `mmap` est utilisé. Il permet de *mapper* (associer) un fichier dans la mémoire du processus.
+
+```c
+void *mmap(
+    void *addr, // Adresse de base suggérée (NULL pour laisser le kernel choisir)
+    size_t length, // Taille de la mémoire à mapper
+    int prot, // Protection (PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE)
+    int flags, // Flags (MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS, MAP_FIXED)
+    int fd, // Descripteur de fichier (-1 si MAP_ANONYMOUS)
+    off_t offset // Décalage dans le fichier multiplié par sysconf(_SC_PAGE_SIZE)
+); // Retourne MAP_FAILED en cas d'erreur
+```
+
+Une utilisation classique est de gagner du temps à la lecture d'un fichier en le mappant directement en mémoire :
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main() {
+    int fd = open("test.txt", O_RDWR);
+    struct stat sb;
+    fstat(fd, &sb); // Get file size
+    char *data = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    data[42] = 'A'; // Modify the file in memory
+    write(STDOUT_FILENO, data, sb.st_size);
+    munmap(data, sb.st_size);
+    close(fd);
+}
+```
+
+Allocation de mémoire anonyme. C'est exactement ce que fait `malloc` mais la libc gère également un pool de mémoire pour éviter d'appeler `mmap` à chaque fois.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+
+#define SIZE 4096
+
+int main() {
+    char *buffer = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
+        MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    if (buffer == MAP_FAILED) {
+        perror("mmap");
+        exit(EXIT_FAILURE);
+    }
+
+    sprintf(buffer, "Mémoire allouée avec mmap!");
+    printf("%s\n", buffer);
+
+    munmap(buffer, SIZE);
+}
+```
 
 ## Sockets
 

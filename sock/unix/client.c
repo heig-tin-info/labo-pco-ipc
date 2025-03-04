@@ -40,6 +40,4 @@ int main() {
 
     // 6. Fermer la connexion
     close(client_fd);
-
-    return 0;
 }

@@ -4,12 +4,9 @@
 #include <sys/shm.h>
 #include <string.h>
 
-#define SHM_KEY 1234
-#define SHM_SIZE 1024
-
 int main() {
     // Création d'un segment mémoire partagé
-    int shmid = shmget(SHM_KEY, SHM_SIZE, IPC_CREAT | 0666);
+    int shmid = shmget(1234, 1024, IPC_CREAT | 0666);
     if (shmid == -1) {
         perror("shmget");
         exit(1);

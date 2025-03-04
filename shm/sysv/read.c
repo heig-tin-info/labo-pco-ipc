@@ -11,14 +11,14 @@ int main() {
     int shmid = shmget(SHM_KEY, SHM_SIZE, 0666);
     if (shmid == -1) {
         perror("shmget");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // Attachement au segment
     char *shared_memory = (char *)shmat(shmid, NULL, 0);
     if (shared_memory == (char *)-1) {
         perror("shmat");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // Lecture depuis la mémoire partagée
