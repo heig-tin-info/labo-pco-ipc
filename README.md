@@ -4,6 +4,15 @@
 
 Comprendre les différents mécanismes de communication inter-processus (IPC) POSIX.
 
+## Prérequis
+
+Pour réaliser ce travail, vous devez disposer de :
+
+- Linux (Ubuntu, Debian, Fedora, Arch Linux, etc.)
+- GCC (GNU Compiler Collection)
+- Make (GNU Make)
+- La documentation (man)
+
 ## Exemples
 
 | IPC              | Chemin             |

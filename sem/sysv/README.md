@@ -12,9 +12,9 @@ Ces mots sont empruntés au néerlandais, et signifient respectivement *augmente
 
 ### 1. Compilation
 
-Pour compiler les exemples utilisez simplement `make`.
+Pour compiler les exemples, utilisez simplement `make`.
 
-- `make clean` nettoi les fichiers générés.
+- `make clean` nettoie les fichiers générés.
 - `make all` compile les programmes.
 
 ### 2. Visualiser l'état des sémaphores
@@ -40,7 +40,7 @@ openat(AT_FDCWD, "/proc/sysvipc/sem", O_RDONLY) = 3
 
 ### 3. Incrémenter et décrémenter
 
-Commencez par incrémenter le sémaphore avec `verhogen`. À chaque exécution vous verrez entre parenthèse la valeur du compteur qui s'incrémente.
+Commencez par incrémenter le sémaphore avec `verhogen`. À chaque exécution vous verrez entre parenthèses la valeur du compteur qui s'incrémente.
 
 ```bash
 ./verhogen
@@ -58,15 +58,17 @@ Pour plus d'interactivité, ouvrez deux terminaux en tête à tête par exemple 
 tmux -f /dev/null new-session \; split-window -h
 ```
 
-Pour naviguer des fenêtres (gauche ou droite) utilisez le raccourcis CTRL+b puis flèche gauche ou droite.
+Pour naviguer des fenêtres (gauche ou droite) utilisez le raccourci CTRL+b puis flèche gauche ou droite.
 
-### 4. Vérifier le status
+### 4. Vérifier le statut
 
 Maintenant qu'il est utilisé, vérifiez que le sémaphore a bien été créé avec `ipcs` et `cat /proc/sysvipc/sem`.
 
+> À quoi servent les permissions et que veut dire 666 ?
+
 ### 5. Gestion de lots
 
-Dans un problème typique de [producteur-consommateur](https://fr.wikipedia.org/wiki/Probl%C3%A8me_des_producteurs_et_des_consommateurs), les producteurs de ressources peuvent produire des lots plus petits que n'en n'ont besoin les consommateurs, et réciproquement.
+Dans un problème typique de [producteur-consommateur](https://fr.wikipedia.org/wiki/Probl%C3%A8me_des_producteurs_et_des_consommateurs), les producteurs de ressources peuvent produire des lots plus petits que n'en ont besoin les consommateurs, et réciproquement.
 
 L'idée est donc de modifier les programmes `verhogen` et `proberen` pour qu'ils puissent incrémenter ou décrémenter de plusieurs unités à la fois le sémaphore. La valeur. On appellera donc ces programmes avec un argument qui sera la valeur à incrémenter ou décrémenter.
 
@@ -78,23 +80,49 @@ L'idée est donc de modifier les programmes `verhogen` et `proberen` pour qu'ils
 1. Modifier les deux programmes
 2. Tester les programmes avec des valeurs différentes pour observer qu'il faut appeler `verhogen` plusieurs fois pour que `proberen` se débloque selon la valeur passée en argument.
 
-### 6. Concurrence
+### 6. Concurrence simple
 
-Que se passerait-il si nous avons plusieurs consommateurs ? Imaginons la situation suivante :
+Que se passerait-il si nous avons plusieurs consommateurs ? Imaginons la stratégie suivante :
 
-1. `./proberen 1` est exécuté 10 fois mais en arrière plan.
+1. `./proberen 1` est exécuté 10 fois, mais en arrière-plan.
 2. L'outil `htop` est utilisé pour observer ces processus.
-3. En parallèle dans un autre terminal, produisez des ressources et observer l'ordre de déblocage des consommateurs.
+3. En parallèle dans un autre terminal, produisez des ressources et observez l'ordre de déblocage des consommateurs.
 
+Vous pouvez facilement instancier plusieurs consommateurs en utilisant un script bash :
 
-Exécuter le programme `proberen` et observez son comportement.
+```bash
+for i in {1..10}; do ./verhogen & done
+```
 
-Essayez différentes variantes pour voir comment le sémaphore fonctionne.
+Dans `htop` vous pouvez facilement voir les processus en arrière-plan avec la touche `F4` pour filtrer les processus, désactivez le mode `tree` avec la touche `F5`.
 
-1. Incrémenter plusieurs fois le sémaphore puis décrémenter.
-2. Modifiez les programme `proberen` et `verhogen` pour incrémenter ou décrémenter de plusieurs unités à la fois le sémaphore. La valeur est passée en argument au programme (p.ex. `./verhogen 3`).
-3. Testez ces nouveaux programme par exemple avec un consommateur qui décrémente de 3 unités et un producteur qui incrémente de 2 unités.
-4. À la fin de votre expérience, supprimez le sémaphore avec `./delete`.
+Vous pouvez utiliser `tmux` pour partager l'écran et voir les deux terminaux en même temps.
+
+> Notez l'ordre dans lequel les consommateurs sont débloqués. Est-ce que cela correspond à l'ordre dans lequel ils ont été lancés ?
+
+### 7. Concurrence complexe
+
+L'objectif est de lancer plusieurs consommateurs, mais qui n'ont pas besoin de la même quantité de ressources.
+
+```bash
+./proberen 3 &
+./proberen 2 &
+./proberen 1 &
+```
+
+Produisez ensuite des ressources avec `verhogen` et observez l'ordre de déblocage des consommateurs.
+
+> Qu'observez-vous ?
+
+### 8. Nettoyage
+
+N'oubliez pas de nettoyer votre sémaphore à la fin du travail avec `delete`.
+
+```bash
+./delete
+```
+
+> Que se passe-t-il si vous essayez de supprimer un sémaphore qui est utilisé par un processus ?
 
 ## Explications
 
@@ -147,7 +175,7 @@ semop(semid, &(struct sembuf){.sem_num = 0, .sem_op = -1}, 1);
 
 les opérations suivantes sont effectuées :
 
-1. L'appel système est déclanché et `do_semtimedop()` est appelé.
+1. L'appel système est déclenché et `do_semtimedop()` est appelé.
 
 2. Tentative de décrémentation : la fonction `perform_atomic_semop()` tente de soustraire `1` à `semval` :
 
