@@ -1,21 +1,27 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
-void handler(int signum) {
-    printf("\nGoodbye!\n");
-    exit(0);
+void signal_handler(int sig) {
+    printf("%d: signal %d received!\n", getpid(), sig);
 }
 
 int main() {
-    struct sigaction sa = { .sa_handler = handler, .sa_flags = 0 };
-    sigemptyset(&sa.sa_mask); // Bloque tous les signaux pendant le traitement
-
-    if (sigaction(SIGINT, &sa, NULL) == -1) {
-        perror("sigaction");
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
         exit(EXIT_FAILURE);
     }
 
-    while (1) pause();
+    if (pid == 0) { // Child
+        signal(SIGUSR1, signal_handler);
+        pause(); // Wait for a signal
+    } else { // Parent
+        sleep(1); // Give some time
+        printf("%d: kill(SIGUSR1) -> %d\n", getpid(), pid);
+        kill(pid, SIGUSR1);
+        wait(NULL); // Wait for the child to terminate
+    }
 }

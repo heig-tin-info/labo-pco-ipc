@@ -3,12 +3,13 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-#define SHM_KEY 1234
+#include "key.h"
+
 #define SHM_SIZE 1024
 
 int main() {
     // Récupération du segment mémoire
-    int shmid = shmget(SHM_KEY, SHM_SIZE, 0666);
+    int shmid = shmget(KEY, SHM_SIZE, 0666);
     if (shmid == -1) {
         perror("shmget");
         exit(EXIT_FAILURE);

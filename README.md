@@ -11,22 +11,10 @@ Pour réaliser ce travail, vous devez disposer de :
 - Linux (Ubuntu, Debian, Fedora, Arch Linux, etc.)
 - GCC (GNU Compiler Collection)
 - Make (GNU Make)
-- La documentation (man)
-
-## Exemples
-
-| IPC              | Chemin             |
-| ---------------- | ------------------ |
-| Messages         | [msg/](msg/)       |
-| Sémaphores       | [sem/](sem/)       |
-| Mémoire partagée | [shm/](shm/)       |
-| Tuyaux           | [pipe/](pipe/)     |
-| Sockets          | [socket/](socket/) |
-| Signaux          | [signal/](signal/) |
 
 ## IPC : Rappel de la définition
 
-Les mécanismes IPC (Inter-Process Communication) permettent à des processus de communiquer entre eux. Ils ont été normalisés par POSIX.1 en 1988.
+Les mécanismes IPC (Inter-Process Communication) permettent à des processus de communiquer entre eux. Ils ont été normalisés par *POSIX.1* en 1988.
 
 Il existe plusieurs mécanismes IPC :
 
@@ -34,121 +22,34 @@ Il existe plusieurs mécanismes IPC :
 - Les files de messages
 - Les sémaphores
 - Les mémoires partagées
-- Les tubes nommés
+- Les tubes
 - Les signaux
 - Les sockets
 
-Notre objectif est de passer en revue ces différents mécanismes et de démystifier leur utilisation.
-
-## Note sur la conformité POSIX
-
-La norme POSIX s'active en ajoutant la définition `_XOPEN_SOURCE` avant d'inclure les en-têtes. Par exemple :
-
-```c
-gcc -std=c2x -D_XOPEN_SOURCE=700 program.c
-```
-
-Certains mécanismes sont spécifiques à Linux et ne sont pas POSIX. Attention donc à la portabilité des exemples.
-
-Les systèmes BSD (FreeBSD, OpenBSD, NetBSD) sont conformes à POSIX de même que macOS. Certains anciens systèmes Unix (Solaris, AIX, HP-UX) l'étaient également. En outre Linux est un cas particulier car il n'hérite pas directement du code source d'Unix. Il a été réécrit de zéro en 1991 par Linus Torvalds. Face à la popularité de Linux certaines libertés ont été prises et Linux est dit "Unix-like" et non "Unix", il a une très grande compatibilité POSIX mais n'est pas 100% conforme et ajoute des fonctionnalités non-POSIX qui lui sont propres.
+Notre objectif est de passer en revue ces différents mécanismes et de démystifier leurs utilisations.
 
 ### Signaux
 
 Les signaux sont la forme la plus simple de communication inter-processus. Ils permettent à un processus d'envoyer une notification à un autre processus. Les signaux sont utilisés pour gérer les interruptions, les erreurs, les événements, etc. Ils ne transportent pas de données.
 
-Les fonctions et appels systèmes associés aux signaux sont les suivantes. La documentation est accessible avec `man 2 <fonction>` :
-
-- `kill` : Envoie un signal à un processus.
-- `signal` : Associe une fonction de traitement à un signal *(obsolète)*
-- `sigaction` : Modifie l'action associée à un signal.
-- `sigprocmask` : Modifie le masque de signaux du processus.
-- `sigpending` : Récupère la liste des signaux en attente.
-- `sigwait` : Attend la réception d'un signal.
-
-Les signaux les plus connus sont (accessible depuis `man 7 signal`) :
-
-- `SIGINT` : Interruption depuis le clavier (Ctrl+C)
-- `SIGKILL` : Tue un processus (Pas interceptable)
-- `SIGSTOP` : Met en pause un processus immédiatement (Pas interceptable)
-- `SIGSTP` : Met en pause un processus (Ctrl+Z)
-- `SIGCONT` : Relance un processus arrêté
-- `SIGCHLD` : Un processus fils s'est terminé
-
-Il est courant de redéfinir le comportement d'un signal en utilisant la fonction `signal` ou `sigaction`. Par exemple, pour redéfinir le comportement du signal `SIGINT` et dire aurevoir avant de quitter :
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <unistd.h>
-
-void handler(int signum) {
-    printf("Goodbye!\n");
-    exit(EXIT_SUCCESS);
-}
-
-int main() {
-    struct sigaction sa = { .sa_handler = handler, .sa_flags = 0 };
-    sigemptyset(&sa.sa_mask); // Bloque tous les signaux pendant le traitement
-
-    if (sigaction(SIGINT, &sa, NULL) == -1) {
-        perror("sigaction");
-        exit(EXIT_FAILURE);
-    }
-
-    for (;;) pause();
-}
-```
-
-Notez qu'il est également possible d'accéder aux signaux en attente depuis `/proc`:
-
-```text
-cat /proc/3660502/status | grep Sig
-SigQ:   2/256994          # Signaux temps réel en attente
-SigPnd: 0000000000000000  # Nombre de signaux en attente
-SigBlk: 0000000000000000  # Signaux bloqués (masqués)
-SigIgn: 0000000000000000  # Signaux ignorés par le processus
-SigCgt: 0000000000010002  # Signaux capturés par le processus
-```
-
-Le kernel permet de modifier la limite des signaux en attentes avec `ulimit -i`.
-
-```text
-ulimit -q # Limite par défaut
-ulimit -q 200000 # Limite à 200000 signaux pour le shelle courant
-```
-
-#### Exercice
-
-Créer un programme en C qui capture `SIGINT`, `SIGUSR1` et `SIGUSR2` et qui ignore `SIGALRM`. Le programme doit afficher un message lors de la réception de chaque signal capturés.
-
-1. Essayez d'envoyer des signaux au processus
-2. Vérifier que l'état de `SigCgt` est correct avec votre configuration (utiliser `/proc` et l'aide de `man 7 signal`).
-3. Vérifiez que l'état de `SigIgn` est correct avec votre configuration.
-
-#### Quiz
-
-1. Quel est le signal envoyé par défaut avec `Ctrl+C` ?
-2. Quel est le signal envoyé par défaut avec `Ctrl+Z` ?
-3. Quel est le signal envoyé par défaut avec `kill` ?
-4. De combien de signaux utilisateurs un processus peut-il disposer ?
+Rendez-vous à la section [signal](signal/README.md)
 
 ### Sémaphores
 
 Les sémaphores sont des objets de synchronisation qui permettent de contrôler l'accès à une ressource partagée. Ils sont utilisés pour résoudre les problèmes de concurrence entre processus et, comme les signaux, ils ne transportent pas de données.
 
-Un sémaphore est basiquement un *compteur* qui s'incrément ou se *décrémente*  pour contrôler l'accès à une ressource partagée. Deux opérations sont possibles :
+Un sémaphore est basiquement un *compteur* qui s'incrément ou se *décrémente*  pour contrôler l'accès à une ressource partagée. Selon la publication initiale de Dijkstra, un sémaphore accepte deux opérations :
 
 - `P` (Proberen) : Attente. Si le sémaphore est positif, il est décrémenté. Sinon, le processus est mis en attente.
 - `V` (Verhogen) : Libération. Incrémente le sémaphore.
 
-Il faut voir le sémaphore comme un mécanisme de jetons pour accéder à des outils partagés. Si aucun jetons n'est disponible, vous attendez que quelqu'un ramène l'outil, et dépose le jeton qu'il a pris. Certains outils peuvent nécessiter plusieurs jetons pour être utilisés alors vous devez attendre que le nombre de jetons nécessaires soient disponibles.
+Il faut donc voir le sémaphore comme un mécanisme de jetons pour accéder à des outils partagés. Si aucun jetons n'est disponible, vous attendez que quelqu'un ramène l'outil, et dépose le jeton qu'il a pris. Certains outils peuvent nécessiter plusieurs jetons pour être utilisés alors vous devez attendre que le nombre de jetons nécessaires soient disponibles.
 
 #### Sémaphores System V
 
-Historiquement sous Unix (System V), les sémaphores étaient implémentés avec les appels systèmes `semget`, `semop` et `semctl`. C'est un mécanisme simple, toujours supporté par POSIX mais qui n'est plus utilisé réelle.
+Historiquement sous Unix (System V), les sémaphores étaient implémentés avec des appels systèmes `semget`, `semop` et `semctl`. C'est un mécanisme simple, toujours supporté par POSIX mais qui n'est plus vraimeent utilisé.
 
-Dans le noyau Linux, les sémaphores System V sont stockés dans `/proc/sysvipc/sem` (*System V IPC / SEMaphores*). Au niveau des sources, ils sont implémentés dans [ipc/sem.c](https://github.com/torvalds/linux/blob/master/ipc/sem.c).
+Dans le noyau Linux, ce type de sémaphores sont accessibles depuis `/proc/sysvipc/sem` (*System V IPC / SEMaphores*). Au niveau des sources, ils sont implémentés dans [ipc/sem.c](https://github.com/torvalds/linux/blob/master/ipc/sem.c).
 
 Aujourd'hui, on utilise les sémaphores dit POSIX qui sont une amélioration des sémaphores System V.
 
@@ -158,23 +59,13 @@ Les fonctions associées aux sémaphores de System V sont :
 - `semop` : Modifie un ensemble de sémaphores
 - `semctl` : Contrôle un ensemble de sémaphores
 
-Notez que le kernel met à disposition l'état de ces sémaphores dans `/proc/sysvipc/sem` (*System V IPC / SEMaphores*).
-
-Un exemple de fonctionnement est donné dans `sem/sysv/`, rendez-vous dans [sem/sysv/README.md](sem/sysv/README.md).
+> Rendez-vous dans [sem/sysv](sem/sysv/README.md)
 
 #### Sémaphores POSIX
 
-Rendez-vous dans `man -L fr 7 sem_overview` pour voir la documentation des sémaphores POSIX. Profitez pour installer les manuels en français avec `sudo apt install manpages-fr`. Cela vous renseigne sur les différentes fonctions associées aux sémaphores POSIX :
+Commencez par accéder à `man -L fr 7 sem_overview` pour voir la documentation des sémaphores POSIX. Profitez pour installer les manuels en français avec `sudo apt install manpages-fr`.
 
-- `sem_open` : Crée ou ouvre un sémaphore
-- `sem_close` : Ferme un sémaphore
-- `sem_unlink` : Supprime un sémaphore
-- `sem_init` : Initialise un sémaphore
-- `sem_post` : Incrémente un sémaphore
-- `sem_wait` : Décrémente un sémaphore
-- `sem_getvalue` : Récupère la valeur d'un sémaphore
-
-Les sémaphores POSIX sont plus simples à utiliser que les sémaphores System V. Contrairement aux sémaphores System V qui possède une clé et qui sont partagés entre les processus, les sémaphores POSIX sont stockés dans le système de fichier dans `/dev/shm` et sont accessibles par tous les processus.
+> Rendez-vous dans [sem/posix](sem/posix/README.md)
 
 ### Vérouillage de fichiers
 
@@ -304,7 +195,7 @@ int main() {
 
 Cependant, il est néanmoins possible de partager de la mémoire entre deux processus en utilisant la **mémoire partagée**.
 
-Comme pour les autres IPC que nous avons vu, il existe deux implémentations toujours dans le kernel, une héritée de System V (ancienne) et une POSIX (moderne). Les fonctions associées sont les suivantes :
+Comme pour certains autres IPC, il existe deux implémentations toujours dans le kernel, une héritée de System V (ancienne) et une POSIX (moins ancienne). Les fonctions associées sont les suivantes :
 
 | Critère                 | System V               | POSIX                        |
 | ----------------------- | ---------------------- | ---------------------------- |
@@ -316,6 +207,8 @@ Comme pour les autres IPC que nous avons vu, il existe deux implémentations tou
 | Stockage                | Géré par le noyau      | Fichier en mémoire (`tmpfs`) |
 | Simplicité              | Plus complexe          | Plus moderne et simple       |
 | Utilisation recommandée | Applications anciennes | Applications modernes        |
+
+> Rendez-vous dans [shm/sysv](shm/sysv/README.md)
 
 ### Mmap
 
