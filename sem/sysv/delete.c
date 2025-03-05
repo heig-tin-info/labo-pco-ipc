@@ -11,6 +11,6 @@ int main() {
         perror("semget");
         exit(1);
     }
-    semop(semid, &(struct sembuf){.sem_op=1}, 1);
-    printf("Semaphore triggered! (%d)\n", semctl(semid, 0, GETVAL));
+    semctl(semid, 0, IPC_RMID);
+    printf("Semaphore removed!\n");
 }

@@ -15,7 +15,6 @@ Comprendre les différents mécanismes de communication inter-processus (IPC) PO
 | Sockets          | [socket/](socket/) |
 | Signaux          | [signal/](signal/) |
 
-
 ## IPC : Rappel de la définition
 
 Les mécanismes IPC (Inter-Process Communication) permettent à des processus de communiquer entre eux. Ils ont été normalisés par POSIX.1 en 1988.
@@ -127,9 +126,9 @@ Créer un programme en C qui capture `SIGINT`, `SIGUSR1` et `SIGUSR2` et qui ign
 
 ### Sémaphores
 
-Les sémaphores sont des objets de synchronisation qui permettent de contrôler l'accès à une ressource partagée. Ils sont utilisés pour résoudre les problèmes de concurrence entre processus et comme les signaux, ils ne transportent pas de données.
+Les sémaphores sont des objets de synchronisation qui permettent de contrôler l'accès à une ressource partagée. Ils sont utilisés pour résoudre les problèmes de concurrence entre processus et, comme les signaux, ils ne transportent pas de données.
 
-Un sémaphore est basiquement un *compteur* qui s'incrément ou se *décrémente*  pour contrôler l'accès à une ressource partagée. Il démarre à une donnée et deux opérations sont possibles :
+Un sémaphore est basiquement un *compteur* qui s'incrément ou se *décrémente*  pour contrôler l'accès à une ressource partagée. Deux opérations sont possibles :
 
 - `P` (Proberen) : Attente. Si le sémaphore est positif, il est décrémenté. Sinon, le processus est mis en attente.
 - `V` (Verhogen) : Libération. Incrémente le sémaphore.
@@ -139,6 +138,9 @@ Il faut voir le sémaphore comme un mécanisme de jetons pour accéder à des ou
 #### Sémaphores System V
 
 Historiquement sous Unix (System V), les sémaphores étaient implémentés avec les appels systèmes `semget`, `semop` et `semctl`. C'est un mécanisme simple, toujours supporté par POSIX mais qui n'est plus utilisé réelle.
+
+Dans le noyau Linux, les sémaphores System V sont stockés dans `/proc/sysvipc/sem` (*System V IPC / SEMaphores*). Au niveau des sources, ils sont implémentés dans [ipc/sem.c](https://github.com/torvalds/linux/blob/master/ipc/sem.c).
+
 Aujourd'hui, on utilise les sémaphores dit POSIX qui sont une amélioration des sémaphores System V.
 
 Les fonctions associées aux sémaphores de System V sont :
@@ -149,36 +151,7 @@ Les fonctions associées aux sémaphores de System V sont :
 
 Notez que le kernel met à disposition l'état de ces sémaphores dans `/proc/sysvipc/sem` (*System V IPC / SEMaphores*).
 
-Pour tester cela écrire deux programmes :
-
-1. `verhogen.c` qui incrémente le sémaphore à la clé 1234.
-2. `proberen.c` qui attend qu'une ressource soit disponible sur le sémaphore 1234, puis décrémente le sémaphore et affiche un message.
-
-La première étape est de créer un ensemble de sémaphores avec `semget` :
-
-```c
-int semid = semget(1234, 1 /* Nombre de sémaphores */,
-    IPC_CREAT /* Créer si n'existe pas */
-    | 0666 /* Droits d'accès */);
-```
-
-Il faut s'assurer que `semid` est différent de `-1` pour vérifier que l'ensemble de sémaphores a bien été créé.
-
-Puis on peut incrémenter le sémaphore avec `semop` :
-
-```c
-semop(semid, &(struct sembuf){.sem_op = 1}, 1);
-```
-
-On selectionne le sémaphore 0, sans falgs et on incrémente le sémaphore de 1.
-
-Pour vérifier la valeur du sémaphore, on peut utiliser `semctl` :
-
-```c
-int value = semctl(semid, 0, GETVAL);
-```
-
-Si vous êtes bloqués, rendez-vous dans `sem/` pour voir la solution et la tester.
+Un exemple de fonctionnement est donné dans `sem/sysv/`, rendez-vous dans [sem/sysv/README.md](sem/sysv/README.md).
 
 #### Sémaphores POSIX
 
