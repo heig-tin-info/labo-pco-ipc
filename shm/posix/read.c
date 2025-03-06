@@ -4,8 +4,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "common.h"
+
 int main() {
-    int fd = shm_open("/posix_shm", O_RDWR, 0666);
+    int fd = shm_open(SHM_NAME, O_RDWR, 0666);
     if (fd == -1) {
         perror("shm_open");
         exit(EXIT_FAILURE);
@@ -29,5 +31,5 @@ int main() {
 
     munmap(shared_memory, size);
     close(fd);
-    shm_unlink("/posix_shm");
+    shm_unlink(SHM_NAME);
 }

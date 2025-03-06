@@ -3,20 +3,17 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <string.h>
 
 #include "common.h"
 
 int main() {
-    // Create a shared memory segment
-    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
+    int fd = shm_open("/prout", O_RDWR, 0666);
     if (fd == -1) {
         perror("shm_open");
         exit(EXIT_FAILURE);
     }
 
-    // By default, provided file has a size of 0 bytes
-    // We need to set the size of the shared memory segment
+    // Ensure size is set
     const size_t size = 1024;
     if (ftruncate(fd, size) == -1) {
         perror("ftruncate");
@@ -30,11 +27,9 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Write something in the shared memory
-    strcpy(shared_memory, "Hello from POSIX SHM!");
-    printf("Wrote: %s\n", shared_memory);
+    printf("Read: %s\n", shared_memory);
 
-    // Detach the shared memory segment
     munmap(shared_memory, size);
     close(fd);
+    shm_unlink("/prout");
 }

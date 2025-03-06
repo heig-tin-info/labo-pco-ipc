@@ -12,6 +12,26 @@ Pour réaliser ce travail, vous devez disposer de :
 - GCC (GNU Compiler Collection)
 - Make (GNU Make)
 
+### Documentation (manpages)
+
+Pour ce travail pratique nous allons utiliser la documentation Linux et principalement les `manpages`. Les `man` pour manual pages sont des pages de manuel qui décrivent les fonctions du système, les fichiers spéciaux, les appels systèmes, etc.
+
+Par défaut la documentation n'est pas nécessairement installée et n'est pas forcément disponible en français.
+
+```bash
+sudo apt install -y manpages-fr manpages-posix manpages-posix-dev
+wget http://manpagesfr.free.fr/download/man-pages-fr-3.03.0.tar.bz2
+tar xvjf man-pages-fr-3.03.0.tar.bz2
+cp -r man-pages-fr-3.03.0/man* /usr/share/man/fr
+rm man-pages-fr-3.03.0.tar.bz2
+```
+
+Pour spécifier la langue par défaut des manpages, vous pouvez ajouter la ligne suivante dans votre fichier `~/.bashrc` :
+
+```bash
+alias man='man -L fr'
+```
+
 ## IPC : Rappel de la définition
 
 Les mécanismes IPC (Inter-Process Communication) permettent à des processus de communiquer entre eux. Ils ont été normalisés par *POSIX.1* en 1988.

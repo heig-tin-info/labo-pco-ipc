@@ -87,12 +87,12 @@ Notez qu'il est également possible d'accéder aux signaux en attente depuis `/p
 
 ## 5. Status du processus
 
-Depuis `/proc` il est possible de consulter les signaux en attente pour un processus donné. Par exemple, pour le processus `3660502` :
+Depuis `/proc` il est possible de consulter les signaux en attente pour un processus donné. Par exemple, pour le processus `test` :
 
 ```text
-cat /proc/3660502/status | grep Sig
-SigQ:   2/256994          # Signaux temps réel en attente
-SigPnd: 0000000000000000  # Nombre de signaux en attente
+$ cat /proc/$(pgrep test)/status | grep -P 'S(ig|hd)\w{3}'
+ShdPnd: 0000000000000080  # Signaux en attente dans son ensemble
+SigPnd: 0000000000000000  # Signaux en attente du thread
 SigBlk: 0000000000000000  # Signaux bloqués (masqués)
 SigIgn: 0000000000000000  # Signaux ignorés par le processus
 SigCgt: 0000000000010002  # Signaux capturés par le processus
@@ -101,3 +101,7 @@ SigCgt: 0000000000010002  # Signaux capturés par le processus
 Vous trouverez dans `man 5 proc` la description des champs de `/proc/[pid]/status`.
 
 > À quoi servent les champs `SigPnd`, `SigBlk`, `SigIgn` et `SigCgt` ?
+
+Prenez connaissance du programme [test.c](test.c) et testez le programme. Durant l'exécution du programme, nous souhaitons envoyer un signal `SIGUSR2` et avant la fin de l'exécution, afficher le status dans `/proc`.
+
+> Parvenez-vous à expliquer les valeurs affichées ?
