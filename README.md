@@ -48,11 +48,52 @@ Il existe plusieurs mécanismes IPC :
 
 Notre objectif est de passer en revue ces différents mécanismes et de démystifier leurs utilisations.
 
+## IPC : Les mécanismes
+
 ### Signaux
 
 Les signaux sont la forme la plus simple de communication inter-processus. Ils permettent à un processus d'envoyer une notification à un autre processus. Les signaux sont utilisés pour gérer les interruptions, les erreurs, les événements, etc. Ils ne transportent pas de données.
 
 Rendez-vous à la section [signal](signal/README.md)
+
+### Mémoire partagée
+
+Les processus sont étanches les uns des autres. Ils ne peuvent pas accéder à la mémoire des autres processus. Même un processus qui utilise `fork` ne peut pas accéder à la mémoire de son père. La preuve en code :
+
+```c
+#include <stdio.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int x = 42;
+
+int main() {
+    if (fork() == 0) {
+        x = 0;
+    } else {
+        wait(NULL);
+    }
+    printf("x = %d\n", x); // Affiche 0 puis 42... pourquoi ?
+}
+```
+
+Cependant, il est néanmoins possible de partager de la mémoire entre deux processus en utilisant la **mémoire partagée**.
+
+Comme pour certains autres IPC, il existe deux implémentations: une héritée de System V (ancienne) et une POSIX (moins ancienne). Les fonctions associées sont les suivantes :
+
+| Critère                 | System V               | POSIX                        |
+| ----------------------- | ---------------------- | ---------------------------- |
+| Création                | `shmget()`             | `shm_open()`                 |
+| Attachement             | `shmat()`              | `mmap()`                     |
+| Détachement             | `shmdt()`              | `munmap()`                   |
+| Suppression             | `shmctl(IPC_RMID)`     | `shm_unlink()`               |
+| Visibilité              | `ipcs -m`              | Fichiers dans `/dev/shm`     |
+| Stockage                | Géré par le noyau      | Fichier en mémoire (`tmpfs`) |
+| Simplicité              | Plus complexe          | Plus moderne et simple       |
+| Utilisation recommandée | Applications anciennes | Applications modernes        |
+
+> Rendez-vous dans [shm/sysv](shm/sysv/README.md)
+
 
 ### Sémaphores
 
@@ -192,104 +233,6 @@ Avec POSIX on a :
 - `mq_unlink` : Supprime une file de messages
 - `mq_getattr` : Récupère les attributs d'une file de messages
 
-## Mémoire partagée
-
-Les processus sont étanches les uns des autres. Ils ne peuvent pas accéder à la mémoire des autres processus. Même un processus qui utilise `fork` ne peut pas accéder à la mémoire de son père. La preuve en code :
-
-```c
-#include <stdio.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-int x = 42;
-
-int main() {
-    if (fork() == 0) {
-        x = 0;
-    } else {
-        wait(NULL);
-    }
-    printf("x = %d\n", x); // Affiche 0 puis 42... pourquoi ?
-}
-```
-
-Cependant, il est néanmoins possible de partager de la mémoire entre deux processus en utilisant la **mémoire partagée**.
-
-Comme pour certains autres IPC, il existe deux implémentations toujours dans le kernel, une héritée de System V (ancienne) et une POSIX (moins ancienne). Les fonctions associées sont les suivantes :
-
-| Critère                 | System V               | POSIX                        |
-| ----------------------- | ---------------------- | ---------------------------- |
-| Création                | `shmget()`             | `shm_open()`                 |
-| Attachement             | `shmat()`              | `mmap()`                     |
-| Détachement             | `shmdt()`              | `munmap()`                   |
-| Suppression             | `shmctl(IPC_RMID)`     | `shm_unlink()`               |
-| Visibilité              | `ipcs -m`              | Fichiers dans `/dev/shm`     |
-| Stockage                | Géré par le noyau      | Fichier en mémoire (`tmpfs`) |
-| Simplicité              | Plus complexe          | Plus moderne et simple       |
-| Utilisation recommandée | Applications anciennes | Applications modernes        |
-
-> Rendez-vous dans [shm/sysv](shm/sysv/README.md)
-
-### Mmap
-
-Dans la variante moderne, l'appel système `mmap` est utilisé. Il permet de *mapper* (associer) un fichier dans la mémoire du processus.
-
-```c
-void *mmap(
-    void *addr, // Adresse de base suggérée (NULL pour laisser le kernel choisir)
-    size_t length, // Taille de la mémoire à mapper
-    int prot, // Protection (PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE)
-    int flags, // Flags (MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS, MAP_FIXED)
-    int fd, // Descripteur de fichier (-1 si MAP_ANONYMOUS)
-    off_t offset // Décalage dans le fichier multiplié par sysconf(_SC_PAGE_SIZE)
-); // Retourne MAP_FAILED en cas d'erreur
-```
-
-Une utilisation classique est de gagner du temps à la lecture d'un fichier en le mappant directement en mémoire :
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-int main() {
-    int fd = open("test.txt", O_RDWR);
-    struct stat sb;
-    fstat(fd, &sb); // Get file size
-    char *data = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-    data[42] = 'A'; // Modify the file in memory
-    write(STDOUT_FILENO, data, sb.st_size);
-    munmap(data, sb.st_size);
-    close(fd);
-}
-```
-
-Allocation de mémoire anonyme. C'est exactement ce que fait `malloc` mais la libc gère également un pool de mémoire pour éviter d'appeler `mmap` à chaque fois.
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-
-#define SIZE 4096
-
-int main() {
-    char *buffer = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
-        MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-    if (buffer == MAP_FAILED) {
-        perror("mmap");
-        exit(EXIT_FAILURE);
-    }
-
-    sprintf(buffer, "Mémoire allouée avec mmap!");
-    printf("%s\n", buffer);
-
-    munmap(buffer, SIZE);
-}
-```
 
 ## Sockets
 

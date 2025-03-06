@@ -67,3 +67,64 @@ Il est également possible de n'utiliser que l'appel système `mmap` pour créer
 Prenez connaissances du programme `read-write.c` et exécutez-le.
 
 > C'est quoi pthread?
+
+## Mmap
+
+Dans la variante moderne, l'appel système `mmap` est utilisé. Il permet de *mapper* (associer) un fichier dans la mémoire du processus.
+
+```c
+void *mmap(
+    void *addr, // Adresse de base suggérée (NULL pour laisser le kernel choisir)
+    size_t length, // Taille de la mémoire à mapper
+    int prot, // Protection (PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE)
+    int flags, // Flags (MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS, MAP_FIXED)
+    int fd, // Descripteur de fichier (-1 si MAP_ANONYMOUS)
+    off_t offset // Décalage dans le fichier multiplié par sysconf(_SC_PAGE_SIZE)
+); // Retourne MAP_FAILED en cas d'erreur
+```
+
+Une utilisation classique est de gagner du temps à la lecture d'un fichier en le mappant directement en mémoire :
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main() {
+    int fd = open("test.txt", O_RDWR);
+    struct stat sb;
+    fstat(fd, &sb); // Get file size
+    char *data = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    data[42] = 'A'; // Modify the file in memory
+    write(STDOUT_FILENO, data, sb.st_size);
+    munmap(data, sb.st_size);
+    close(fd);
+}
+```
+
+Allocation de mémoire anonyme. C'est exactement ce que fait `malloc` mais la libc gère également un pool de mémoire pour éviter d'appeler `mmap` à chaque fois.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+
+#define SIZE 4096
+
+int main() {
+    char *buffer = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
+        MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    if (buffer == MAP_FAILED) {
+        perror("mmap");
+        exit(EXIT_FAILURE);
+    }
+
+    sprintf(buffer, "Mémoire allouée avec mmap!");
+    printf("%s\n", buffer);
+
+    munmap(buffer, SIZE);
+}
+```
