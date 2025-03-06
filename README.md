@@ -11,6 +11,7 @@ Pour réaliser ce travail, vous devez disposer de :
 - Linux (Ubuntu, Debian, Fedora, Arch Linux, etc.)
 - GCC (GNU Compiler Collection)
 - Make (GNU Make)
+- La documentation si possible en français
 
 ### Documentation (manpages)
 
@@ -38,13 +39,13 @@ Les mécanismes IPC (Inter-Process Communication) permettent à des processus de
 
 Il existe plusieurs mécanismes IPC :
 
-- Vérouillage de fichiers
-- Les files de messages
-- Les sémaphores
-- Les mémoires partagées
-- Les tubes
 - Les signaux
+- Les mémoires partagées
+- Les sémaphores
+- Les tubes
+- Les files de messages
 - Les sockets
+- Vérouillage de fichiers
 
 Notre objectif est de passer en revue ces différents mécanismes et de démystifier leurs utilisations.
 
@@ -94,7 +95,6 @@ Comme pour certains autres IPC, il existe deux implémentations: une héritée d
 
 > Rendez-vous dans [shm/sysv](shm/sysv/README.md)
 
-
 ### Sémaphores
 
 Les sémaphores sont des objets de synchronisation qui permettent de contrôler l'accès à une ressource partagée. Ils sont utilisés pour résoudre les problèmes de concurrence entre processus et, comme les signaux, ils ne transportent pas de données.
@@ -128,32 +128,12 @@ Commencez par accéder à `man -L fr 7 sem_overview` pour voir la documentation 
 
 > Rendez-vous dans [sem/posix](sem/posix/README.md)
 
-### Vérouillage de fichiers
-
-Deux processus peuvent exploiter un fichier en même temps leur permettant d'échanger de l'information. Le problème est que si un processus écrit dans le fichier, l'autre processus ne pourra pas lire l'information tant que le premier n'aura pas terminé d'écrire. Il y a donc un problème de synchronisation, et donc de concurrence.
-
-L'astuce est d'utiliser des fonctions de vérouillage de fichiers. Ces fonctions permettent de vérouiller un fichier pour qu'un seul processus puisse y accéder à la fois. Cela permet de synchroniser les accès.
-
-Ces opérations sont réalisées avec la fonction `fcntl` et les drapeaux `F_SETLKW`et `F_SETLK` :
-
-Imaginons deux processus :
-
-- Processus 1 : producteur de donnée, il écrit dans le fichier
-- Processus 2 : consommateur de donnée, il lit dans le fichier
-
-Testez l'exemple donné [ici](file-locking.c).
 
 ### Tube/Tuyaux (*pipes*)
 
 Un tube est un mécanisme **uni-directionnel** de communication entre deux processus. Il est créé par un processus et partagé avec un autre processus. Il peut être notamment utilisé pour la communication entre un processus père et un processus fils.
 
-Chaque processus dispose de base de 3 flux de données :
 
-- `stdin` : Entrée standard
-- `stdout` : Sortie standard
-- `stderr` : Sortie d'erreur
-
-Note que vous pouvez accéder aux descripteurs de fichiers ouverts dans `/proc/<pid>/fd/`.
 
 #### Tuyau anonyme (*anonymous pipe*)
 
@@ -233,8 +213,22 @@ Avec POSIX on a :
 - `mq_unlink` : Supprime une file de messages
 - `mq_getattr` : Récupère les attributs d'une file de messages
 
+### Vérouillage de fichiers
 
-## Sockets
+Deux processus peuvent exploiter un fichier en même temps leur permettant d'échanger de l'information. Le problème est que si un processus écrit dans le fichier, l'autre processus ne pourra pas lire l'information tant que le premier n'aura pas terminé d'écrire. Il y a donc un problème de synchronisation, et donc de concurrence.
+
+L'astuce est d'utiliser des fonctions de vérouillage de fichiers. Ces fonctions permettent de vérouiller un fichier pour qu'un seul processus puisse y accéder à la fois. Cela permet de synchroniser les accès.
+
+Ces opérations sont réalisées avec la fonction `fcntl` et les drapeaux `F_SETLKW`et `F_SETLK` :
+
+Imaginons deux processus :
+
+- Processus 1 : producteur de donnée, il écrit dans le fichier
+- Processus 2 : consommateur de donnée, il lit dans le fichier
+
+Testez l'exemple donné [ici](file-locking.c).
+
+### Sockets
 
 Enfin, les sockets. Contrairement aux mécanismes que nous avons vu précédemment, les sockets permettent la communication entre processus sur des machines distantes via le réseau. Les sockets sont très fréquemment utilisé au sein d'une même machine pour la communication inter-processus, et dans une large mesure en remplacement des autres mécanismes IPC.
 
