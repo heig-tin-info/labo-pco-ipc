@@ -3,7 +3,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 
-#define MSG_KEY 1234
+#include "key.h"
 
 struct message {
     long type;
@@ -23,8 +23,5 @@ int main() {
         exit(1);
     }
 
-    printf("Message reçu : %s\n", msg.text);
-
-    // Suppression de la file de messages après utilisation
-    msgctl(msgid, IPC_RMID, NULL);
+    printf("Received: %s\n", msg.text);
 }

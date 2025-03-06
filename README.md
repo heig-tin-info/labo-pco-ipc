@@ -128,83 +128,31 @@ Commencez par accéder à `man -L fr 7 sem_overview` pour voir la documentation 
 
 > Rendez-vous dans [sem/posix](sem/posix/README.md)
 
-
 ### Tube/Tuyaux (*pipes*)
 
 Un tube est un mécanisme **uni-directionnel** de communication entre deux processus. Il est créé par un processus et partagé avec un autre processus. Il peut être notamment utilisé pour la communication entre un processus père et un processus fils.
 
+Le noyau Linux implémente deux types de tuyaux :
 
+- Les tuyaux anonymes (*anonymous pipes*)
+- Les tuyaux nommés (*named pipes*)
 
-#### Tuyau anonyme (*anonymous pipe*)
-
-Un tuyau anonyme comme son nom l'indique ne possède pas de nom. Il est volatile et ne peut être utilisé que par des processus qui partagent un ancêtre commun.
-
-Quand vous écrivez dans Bash :
-
-```bash
-fortune | cowsay -d
-```
-
-Ce qui se passe derrière c'est que `fortune` écrit dans un tuyau anonyme et `cowsay` lit dans ce tuyau.
-
-```c
-// pipe-fortune-cowsay.c
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-int main() {
-    int pipefd[2]; // A pipe has two ends: pipefd[0] (output) and pipefd[1] (input)
-    if (pipe(pipefd) == -1) {
-        perror("pipe");
-        exit(1);
-    }
-
-    pid_t pid = fork();
-    if (pid == -1) {
-        perror("fork");
-        exit(1);
-    }
-
-    if (pid == 0) {
-        // Child process
-        close(pipefd[0]);
-        dup2(pipefd[1], STDOUT_FILENO);  // Redirect stdout to pipefd[1]
-        close(pipefd[1]);
-        execlp("fortune", "fortune", NULL);
-    } else {
-        // Parent process
-        close(pipefd[1]);
-        dup2(pipefd[0], STDIN_FILENO);  // Redirect stdin to pipefd[0]
-        close(pipefd[0]);
-        execlp("cowsay", "cowsay", "-d", NULL);
-    }
-}
-```
-
-L'appel système `dup2` prend un descripteur de fichier (numéro de fichier ouvert) et le remplace par un autre. Ici, on associe une extrémité du tube soit l'entrée standard (`STDIN_FILENO`) soit la sortie standard (`STDOUT_FILENO`) à l'identifiant de cette extrémité.
-
-### Tuyau nommé (*named pipe*)
-
-Un tuyau nommé est un mécanisme **bi-directionnel** de communication entre deux processus. Sa durée de vie n'est pas celle du processus comme le tuyau anonyme qui est détruit à la fin du processus. Il peut donc être partagé entre plusieurs processus.
+> Rendez-vous dans [pipe](pipe/README.md)
 
 ### Files de messages (*message queue*)
 
 Les files de messages permettent aux processus d'échanger des messages d'une manière structurée. Chaque message est placé dans une file d'attente et est lu par un autre processus. Les messages sont délivrés dans l'ordre dans lequel ils ont été envoyés.
 
-De la même manière que pour les sémaphores, les files de messages ont tout d'abord été implémentées dans Unix System V. Aujourd'hui, on utilise les files de messages POSIX.
+De la même manière que pour les sémaphores et la mémoire partagée, les files de messages ont tout d'abord été implémentées dans **Unix** *System V*. Aujourd'hui, on utilise les files de messages **POSIX**.
 
-Historiquement sous Unix (System V), les fonctions étaient :
+Historiquement sous **Unix** (*System V*), les fonctions étaient :
 
 - `msgget` : Crée ou accède à une file de messages
 - `msgsnd` : Envoie un message dans une file de messages
 - `msgrcv` : Reçoit un message dans une file de messages
 - `msgctl` : Contrôle une file de messages
 
-Avec POSIX on a :
+Avec **POSIX** on a :
 
 - `mq_open` : Crée ou ouvre une file de messages
 - `mq_send` : Envoie un message dans une file de messages
@@ -212,6 +160,9 @@ Avec POSIX on a :
 - `mq_close` : Ferme une file de messages
 - `mq_unlink` : Supprime une file de messages
 - `mq_getattr` : Récupère les attributs d'une file de messages
+
+> Rendez-vous dans [msg/sysv](msg/sysv/README.md)
+> Rendez-vous dans [msg/posix](msg/posix/README.md)
 
 ### Vérouillage de fichiers
 

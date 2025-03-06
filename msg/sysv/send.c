@@ -4,24 +4,27 @@
 #include <sys/msg.h>
 #include <string.h>
 
-#define MSG_KEY 1234
+#include "key.h"
 
 struct message {
     long type;
     char text[100];
 };
 
-int main() {
+int main(int argc, char *argv[]) {
     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
     if (msgid == -1) {
         perror("msgget");
         exit(1);
     }
 
-    struct message msg = {.type = 1, .text = "Hello, System V Queue!"};
+    char *message = argc > 1 ? argv[1] : "Hello";
+    struct message msg = {1};
+    strncpy(msg.text, message, sizeof(msg.text));
+
     if (msgsnd(msgid, &msg, sizeof(msg.text), 0) == -1) {
         perror("msgsnd");
         exit(1);
     }
-    printf("Message envoyé : %s\n", msg.text);
+    printf("Sent: %s\n", msg.text);
 }
