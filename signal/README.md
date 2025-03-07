@@ -7,7 +7,7 @@ Dans le standard C, l'implémentation est minimum et ne comporte que deux foncti
 - `signal` : Associe une fonction de traitement à un signal
 - `raise` : Emets un signal au processus courant
 
-L'API POSIX est plus complète et met à disposition un ensemble de fonctions décrites ci-dessous. Cette API peut sembler lourde et un peu datée par rapport à des mécanismes plus modernes. Cette complexité vient principalement de l'héritage historique de UNIX à une époque ou les *thread* n'existaient pas.
+L'API POSIX est plus bien plus complète et met à disposition un ensemble de fonctions décrites ci-dessous. Cette API peut sembler lourde et un peu datée par rapport à des mécanismes plus modernes. Cette complexité vient principalement de l'héritage historique de UNIX à une époque ou les *thread* n'existaient pas.
 
 | Fonction       | Description                                                |
 | -------------- | ---------------------------------------------------------- |
@@ -56,36 +56,78 @@ Les signaux les plus connus sont (accessible depuis `man 7 signal`).
 > Quel est le signal envoyé par défaut avec `Ctrl+Z` ?
 > Quel est le signal envoyé par défaut avec `kill` ?
 
-## 2. `signal` et `raise`
+## 2. Programmation d'une alarme (`alarm`)
 
-Le standard C définit `signal` et `raise` pour gérer les signaux. La fonction `signal` permet d'associer une fonction de traitement à un signal. La fonction `raise` permet d'envoyer un signal au processus courant.
+La fonction `alarm` permet de programmer une alarme qui enverra un signal `SIGALRM` au processus courant après un certain temps.
 
-Ce mécanisme est très simple et ne permet pas de gérer les signaux en attente. Il est donc déconseillé d'utiliser `signal` et `raise` dans un programme moderne. Néanmoins une utilisation assez courante est d'arrêter proprement un programme en déclanchent un signal `SIGTERM` depuis le programme lui-même.
+Prenez connaissance du programme [signal/alarm.c](signal/alarm.c) et testez le programme.
 
-En effet, il est probable que le programme soit lancé par un autre programme ou un utilisateur et qu'il soit nécessaire de lui permettre de s'arrêter proprement. Par exemple, un serveur web peut être arrêté proprement en envoyant un signal `SIGTERM`. Le serveur web peut alors fermer les connexions en cours, sauvegarder les données et fermer proprement les fichiers.
+> Si j'envoi un signal au programme pendant l'attente, que ce passe-t-il ?
+> Comment puis-je annuler l'alarme ?
 
-Rien n'empêche que ce serveur décide de s'arrêter lui-même après un certain temps d'inactivité.
+## 3. Interception d'un signal (`signal`)
+
+La fonction `signal` permet de définir une fonction de traitement pour un signal donné. Cette fonction sera appelée lorsque le signal est reçu.
+
+Reprenons notre programme [signal/alarm.c](signal/alarm.c) et ajoutons un traitement pour le signal `SIGALRM` pour afficher le message `Alarm went off!`.
+
+Voir l'aide de `signal(2)` ou `signal(3)` pour plus d'informations.
+
+## 4. Levée d'un signal au processus courant (`raise`)
 
 Jetez un oeil à l'exemple [signal/raise.c](signal/raise.c) et testez le programme.
 
 > Est-ce que cela fonctionne de la même manière si vous remplacez `SIGTERM` par `SIGKILL` ?
-> Observez les appels systèmes générés pour les deux cas. Qu'observez-vous ?
+> Observez les appels systèmes générés (`strace`) pour les deux cas. Qu'observez-vous ?
 
-## 3. Communication avec son enfant
+Notez que `raise` ne lève un signal que pour le processus courant, les enfants ne sont pas affectés.
 
-Un cas de figure très élémentaire est l'envoi d'un signal à son enfant. Observez le code de [signal/signal.c](signal/signal.c) et testez le programme.
+## 5. Communication avec son enfant
 
-Il est courant de redéfinir le comportement d'un signal en utilisant la fonction `signal` ou `sigaction`. Par exemple, pour redéfinir le comportement du signal `SIGINT` et dire aurevoir avant de quitter :
+Un cas de figure très élémentaire est l'envoi d'un signal à son enfant. Observez le code de [signal/signal-child.c](signal/signal-child.c) et testez le programme.
 
-## 4. Sigaction
+> Parvenez-vous à expliquer le comportement du programme ?
+> Que se passe-t-il si vous remplacez `SIGUSR1` par `SIGKILL` ?
 
-L'appel système `sigaction` a été introduit pour remplacer `signal` qui pouvait avoir des comportements indéterminés. `sigaction` permet de définir un comportement plus précis pour un signal donné. Aujourd'hui l'utilisation de `signal` est automatiquement substituée par `sigaction`.
+## 6. Ne se réveille qu'à la réception d'un signal spécifique (`sigwait`)
 
-L'avantage de `sigaction` est de permettre de masquer certains signaux.
-Le fonctionnement est
-Notez qu'il est également possible d'accéder aux signaux en attente depuis `/proc`:
+La fonction `sigwait` permet de mettre en pause le processus courant jusqu'à la réception d'un signal spécifique. Cette fonction est très utile pour synchroniser des processus.
 
-## 5. Status du processus
+En revanche, par défaut, les signaux envoyés à un processus provoquent l'arrêt de ce dernier. Essayez par exemple de lancer une attente puis l'envoi d'un signal au processus :
+
+```bash
+sleep 60 &
+kill -SIGUSR1 $(pgrep sleep)
+```
+
+Le processus `sleep` est arrêté. Pour éviter cela, il est nécessaire de masquer le signal pour désactiver son comportement par défaut. Pour cela, il est possible d'utiliser `sigprocmask`.
+
+Prenez connaissance du programme [signal/sigwait.c](signal/sigwait.c) et testez le programme.
+
+Pour envoyer un signal au programme (que vous avez compilé avec `gcc -osigwait sigwait.c`) utilisez la commande suivante :
+
+```bash
+kill -s <signal> $(pgrep sigwait)
+```
+
+> Pourquoi débloquer le signal `SIGUSR1` avant l'appel de `sigwait` ?
+> Que ce passe-t-il si un autre signal non bloqué comme `SIGALRM` est envoyé au processus ?
+
+## 7. Sigaction
+
+L'appel système `sigaction` a été introduit pour remplacer `signal` qui pouvait avoir des comportements indéterminés. De nos jours, il n'y a plus aucune raison d'utiliser `signal` pour les raisons suivantes :
+
+1. La fonction `signal()` ne bloque pas nécessairement les autres signaux lors de l'exécution du gestionnaire de signal.
+2. La fonction `signal()` réinitialise le gestionnaire de signal à la valeur par défaut après l'exécution du gestionnaire de signal.
+3. Le fonctionnement de `signal()` est dépendant de l'implémentation.
+
+Par exemple, selon le cas, un second signal qui arriverait peut interrompre l'exécution du premier gestionnaire de signal et compromettre la cohérence de l'application. Cela causerait un empilement des signaux.
+
+Même si `signal` fonctionne très bien sous Linux parce qu'il est basé sur `sigaction`, ce n'est pas une manière portable de gérer les signaux car sur un autre système POSIX, le comportement peut être différent.
+
+Prenez connaissance du programme [signal/sigaction.c](signal/sigaction.c) et testez le programme. Vous pouvez tenter d'interrompre le programme avec `Ctrl+C` pour observer le comportement.
+
+## 8. Status du processus
 
 Depuis `/proc` il est possible de consulter les signaux en attente pour un processus donné. Par exemple, pour le processus `test` :
 
@@ -100,8 +142,10 @@ SigCgt: 0000000000010002  # Signaux capturés par le processus
 
 Vous trouverez dans `man 5 proc` la description des champs de `/proc/[pid]/status`.
 
-> À quoi servent les champs `SigPnd`, `SigBlk`, `SigIgn` et `SigCgt` ?
+> À quoi servent les champs `ShdPnd`, `SigBlk`, `SigIgn` et `SigCgt` ?
 
-Prenez connaissance du programme [test.c](test.c) et testez le programme. Durant l'exécution du programme, nous souhaitons envoyer un signal `SIGUSR2` et avant la fin de l'exécution, afficher le status dans `/proc`.
+1. Prenez connaissance du programme [test.c](test.c) et testez le programme.
+2. Durant l'exécution du programme, nous souhaitons envoyer un signal `SIGUSR2` et avant la fin de l'exécution
+3. Le status (`/proc`) doit être affiché après que le signal ait été envoyé.
 
-> Parvenez-vous à expliquer les valeurs affichées ?
+> Parvenez-vous à expliquer les valeurs affichées et la correspondance avec les numéros de signaux ?

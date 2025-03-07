@@ -7,44 +7,28 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
+FILE* file = NULL;
+
+void signal_handler(int signum) {
+    if (signum == SIGINT) {
+        printf("\nCleaning up... (this might take some time)\n");
+        if (file) {
+            fclose(file);
+            remove("/tmp/tmpfile");
+        }
+        sleep(1); // Simulate long cleanup
+        exit(0);
+    }
+}
+
 int main() {
-    struct sigaction sa = {
-        // Dans la très grande majorité des cas, on met 0
-        .sa_flags = 0,
+    sigaction(SIGINT, &(struct sigaction){
+        .sa_handler=signal_handler}, NULL);
 
-        // Quels signaux seront ignorés (masqués)
-        // Il ne doit pas être modifié manuellement, on utilise
-        // sigemptyset() et sigaddset() pour le manipuler
-        .sa_mask = 0x00,
-
-        // Obsolète et non POSIX
-        .sa_restorer = NULL
-    };
-
-    // Efface tous les signaux du masque
-    sigemptyset(&sa.sa_mask);
-
-    // Ajoute tous les signaux au masque
-    sigfillset(&sa.sa_mask);
-
-    // Supprime un signal particulier du masque
-    sigdelset(&sa.sa_mask, SIGINT);
-
-    // Ajoute un signal particulier au masque
-    sigaddset(&sa.sa_mask, SIGUSR1);
-
-    // Crée un nouveau masque utilisateur
-    sigset_t my_mask, oldmask;
-    sigemptyset(&my_mask);
-    sigaddset(&my_mask, SIGUSR1);
-
-    // Bloque les signaux à attendre
-    sigprocmask(SIG_BLOCK, &my_mask, &oldmask);
-
-    // Met le processus en pause et attend un des
-    // signaux du masque, ici SIGUSR1
-    sigsuspend(&my_mask);
-
-    // Restaure le masque original
-    sigprocmask(SIG_SETMASK, &oldmask, NULL);
+    file = fopen("/tmp/tmpfile", "w");
+    while(1) {
+        fprintf(file, "Working hard!\n");
+        fflush(file);
+        sleep(1);
+    }
 }

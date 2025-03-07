@@ -1,3 +1,3 @@
-EXEC := read write
+EXEC := read write worker race
 
 all: $(EXEC)

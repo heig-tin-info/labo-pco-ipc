@@ -11,9 +11,8 @@ Pour réaliser ce travail, vous devez disposer de :
 - Linux (Ubuntu, Debian, Fedora, Arch Linux, etc.)
 - GCC (GNU Compiler Collection)
 - Make (GNU Make)
-- La documentation si possible en français
 
-### Documentation (manpages)
+## Documentation (manpages)
 
 Pour ce travail pratique nous allons utiliser la documentation Linux et principalement les `manpages`. Les `man` pour manual pages sont des pages de manuel qui décrivent les fonctions du système, les fichiers spéciaux, les appels systèmes, etc.
 
@@ -23,7 +22,7 @@ Par défaut la documentation n'est pas nécessairement installée et n'est pas f
 sudo apt install -y manpages-fr manpages-posix manpages-posix-dev
 wget http://manpagesfr.free.fr/download/man-pages-fr-3.03.0.tar.bz2
 tar xvjf man-pages-fr-3.03.0.tar.bz2
-cp -r man-pages-fr-3.03.0/man* /usr/share/man/fr
+sudo cp -r man-pages-fr-3.03.0/man* /usr/share/man/fr
 rm man-pages-fr-3.03.0.tar.bz2
 ```
 
@@ -32,6 +31,91 @@ Pour spécifier la langue par défaut des manpages, vous pouvez ajouter la ligne
 ```bash
 alias man='man -L fr'
 ```
+
+Puis recharger votre fichier de configuration :
+
+```bash
+source ~/.bashrc
+```
+
+### 1. Les manpages ?
+
+Les manpages sont des pages de manuel qui décrivent les fonctions du système, les fichiers spéciaux, les appels systèmes, etc. Il s'agit d'un format imaginé en 1971 par Dennis Ritchie et Ken Thompson pour documenter les fonctions du système Unix lorsqu'il étaient chez Bell Labs.
+
+Ces fichiers textes sont stockés dans `/usr/share/man` et sont organisés en sections :
+
+- Section 1 : Commandes utilisateur
+- Section 2 : Appels système
+- Section 3 : Fonctions de bibliothèque
+- Section 4 : Fichiers spéciaux
+- Section 5 : Formats de fichiers
+- Section 6 : Jeux
+- Section 7 : Conventions, protocoles, etc.
+- Section 8 : Commandes administratives
+- Section 9 : Fonctions du noyau
+
+Le format `troff` (anciennement `roff`) est interpreté par `man` pour afficher les manpages. Il est possible de convertir ces fichiers en `HTML` ou `PDF` avec `man -Thtml` ou `man -Tpdf`.
+
+1. Regardez le contenu brute de nice avec `zless /usr/share/man/man2/nice.2.gz`.
+2. Maintenant regardez la version formatée avec `man 2 nice`.
+
+> Pourquoi utiliser `zless` au lieu de `less` ?
+
+### 2. Invoquer `man`
+
+Tout d'abord, pour afficher une entrée man le plus simple c'est d'utiliser `man` suivi du nom de la commande ou de la fonction.
+
+```bash
+man ls
+```
+
+Lorsque plusieurs entrées sont en conflit comme `printf` qui peut faire référence soit à la commande `printf` soit à la fonction `printf`, vous pouvez spécifier la section:
+
+```bash
+man 1 printf  # Pour afficher la commande
+man 3 printf  # Pour afficher la fonction C standard
+```
+
+Parfois vous ne connaissez pas le nom exact de la commande ou de la fonction, vous pouvez utiliser `man -k` pour chercher une commande.
+
+```bash
+man -k print
+man -k print | grep -P '\bformat'
+```
+
+Lorsque vous ouvrez un manpage, `man` ne s'occupe pas de l'affichage. Sa responsabilité c'est de :
+
+1. Chercher la manpage dans `/usr/share/man`
+2. Vérifier la section demandée
+3. Décompresser le fichier
+4. Applique la mise en page avec l'outil `troff`/`groff`
+5. Envoi le résultat à `less` pour l'affichage selon l'état de la variable d'environnement `PAGER`.
+
+### 3. `less`
+
+Il s'agit d'une évolution de `more` qui permet de lire des fichiers texte. `less` permet de naviguer dans le fichier avec des raccourcis clavier empruntés à `vi`. Voici l'essentiel à retenir :
+
+| Raccourci     | Action                                               |
+| ------------- | ---------------------------------------------------- |
+| `j`, ↓, Enter | Défilement vers le bas de 1 ligne                    |
+| `k` ou ↑      | Défilement vers le haut de 1 ligne                   |
+| espace        | Défilement vers le bas d'un certain nombre de lignes |
+| `g`           | Aller au début du fichier                            |
+| `G`           | Aller à la fin du fichier                            |
+| `/`           | Recherche de texte                                   |
+| `n`           | Aller à l'occurrence suivante                        |
+| `N`           | Aller à l'occurrence précédente                      |
+| `q`           | Quitter `less`                                       |
+
+Notez que la plupart des commandes de saut fonctionnent avec un préfixe numérique. Par exemple, `5j` pour descendre de 5 lignes, ou `42g` pour aller à la ligne 42.
+
+Cela peut vous paraître compliqué mais ce sont là des raccourcis historiques que tout informaticien travaillant sur des environnements POSIX devrait connaître.
+
+1. Ouvrez `man 1 less`.
+2. Allez à la fin du fichier pour connaître le nom de l'auteur.
+3. Recherchez un mot dans le fichier et naviguer dans les occurences avec `n` et `N`.
+
+Très bien, vous avez maintenant les bases pour naviguer dans les manpages. Nous allons maintenant voir comment utiliser les manpages pour comprendre les IPC.
 
 ## IPC : Rappel de la définition
 
@@ -55,11 +139,11 @@ Notre objectif est de passer en revue ces différents mécanismes et de démysti
 
 Les signaux sont la forme la plus simple de communication inter-processus. Ils permettent à un processus d'envoyer une notification à un autre processus. Les signaux sont utilisés pour gérer les interruptions, les erreurs, les événements, etc. Ils ne transportent pas de données.
 
-Rendez-vous à la section [signal](signal/README.md)
+> Rendez-vous à la section [signal](signal/README.md) pour la suite
 
 ### Mémoire partagée
 
-Les processus sont étanches les uns des autres. Ils ne peuvent pas accéder à la mémoire des autres processus. Même un processus qui utilise `fork` ne peut pas accéder à la mémoire de son père. La preuve en code :
+Les processus sont *étanches* les uns des autres. Ils ne peuvent pas accéder à la mémoire des autres processus. Même un processus qui utilise `fork` ne peut pas accéder à la mémoire de son père. La preuve en code :
 
 ```c
 #include <stdio.h>
@@ -78,7 +162,9 @@ int main() {
 }
 ```
 
-Cependant, il est néanmoins possible de partager de la mémoire entre deux processus en utilisant la **mémoire partagée**.
+> Pourquoi la variable `x` n'est-elle pas modifiée dans le parent ?
+
+Cependant, il est néanmoins possible de partager de la mémoire entre deux processus en utilisant de la **mémoire partagée**.
 
 Comme pour certains autres IPC, il existe deux implémentations: une héritée de System V (ancienne) et une POSIX (moins ancienne). Les fonctions associées sont les suivantes :
 
@@ -93,7 +179,7 @@ Comme pour certains autres IPC, il existe deux implémentations: une héritée d
 | Simplicité              | Plus complexe          | Plus moderne et simple       |
 | Utilisation recommandée | Applications anciennes | Applications modernes        |
 
-> Rendez-vous dans [shm/sysv](shm/sysv/README.md)
+> Rendez-vous dans [shm/sysv](shm/sysv/README.md) pour la suite
 
 ### Sémaphores
 
@@ -233,3 +319,9 @@ Dans l'ordre les mécanismes les plus utilisés entre processus sont :
 4. Les Sockets TCP/IP pour la communication entre machines distantes.
 5. La mémoire partagée POSIX (`shm_open` et `mmap`).
 6. Les sémaphores POSIX et les fils de messages POSIX.
+
+
+
+DBus
+DBus
+DBus
