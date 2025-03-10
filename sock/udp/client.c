@@ -4,7 +4,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define PORT 8080
+#define PORT 3636
+#define HOST "127.0.0.1"
 
 int main() {
     int sock = socket(AF_INET, SOCK_DGRAM, 0); // UDP
@@ -17,7 +18,7 @@ int main() {
         .sin_family = AF_INET, // IPv4
         .sin_port = htons(PORT)
     };
-    inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr);
+    inet_pton(AF_INET, HOST, &server_address.sin_addr);
 
     char *message = "Hello Server!";
     sendto(sock, message, strlen(message), 0,

@@ -254,74 +254,26 @@ Avec **POSIX** on a :
 
 Deux processus peuvent exploiter un fichier en même temps leur permettant d'échanger de l'information. Le problème est que si un processus écrit dans le fichier, l'autre processus ne pourra pas lire l'information tant que le premier n'aura pas terminé d'écrire. Il y a donc un problème de synchronisation, et donc de concurrence.
 
-L'astuce est d'utiliser des fonctions de vérouillage de fichiers. Ces fonctions permettent de vérouiller un fichier pour qu'un seul processus puisse y accéder à la fois. Cela permet de synchroniser les accès.
-
-Ces opérations sont réalisées avec la fonction `fcntl` et les drapeaux `F_SETLKW`et `F_SETLK` :
-
-Imaginons deux processus :
-
-- Processus 1 : producteur de donnée, il écrit dans le fichier
-- Processus 2 : consommateur de donnée, il lit dans le fichier
-
-Testez l'exemple donné [ici](file-locking.c).
+> Rendez-vous dans [lock](lock/README.md)
 
 ### Sockets
 
-Enfin, les sockets. Contrairement aux mécanismes que nous avons vu précédemment, les sockets permettent la communication entre processus sur des machines distantes via le réseau. Les sockets sont très fréquemment utilisé au sein d'une même machine pour la communication inter-processus, et dans une large mesure en remplacement des autres mécanismes IPC.
+Contrairement aux mécanismes que nous avons vu précédemment, les sockets permettent la communication entre processus sur des machines distantes via le réseau (internet). Néanmoins, les sockets sont très fréquemment utilisé au sein d'une même machine pour la communication inter-processus, et dans une large mesure en remplacement des autres mécanismes IPC.
 
-Néanmoins lorsque les performances sont critiques, il est préférable d'utiliser les sockets Unix qui ne passent pas par la couche réseau et qui utilsient un fichier pour la communication. Docker ou MySQL utilisent ce mécanisme pour communiquer entre les différents processus.
-
-```c
-int socket(int domain, int type, int protocol);  // Créer une socket
-int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);  // Associer une adresse
-int listen(int sockfd, int backlog);  // Passer en mode écoute
-int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);  // Accepter une connexion
-int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);  // Se connecter à un serveur
-ssize_t send(int sockfd, const void *buf, size_t len, int flags);  // Envoyer des données
-ssize_t recv(int sockfd, void *buf, size_t len, int flags);  // Recevoir des données
-int close(int sockfd);  // Fermer une socket
-```
-
-### Eventfd
-
-`eventfd` est un mécanisme de communication inter-processus qui permet à un processus de signaler un événement à un autre processus. Il est utilisé pour la communication entre processus sur une même machine.
-
-### Signalfd
-
-`signalfd` remplace `sigwait` et `sigaction`. Il permet de lire les signaux comme si c'était des fichiers. Cela permet de les traiter de manière asynchrone.
-
-
-
-## Appels systèmes
-
-- `fork` : Crée un nouveau processus en dupliquant le processus appelant.
-- `fcntl` : Manipule les descripteurs de fichiers.
-- `open` : Ouvre un fichier.
-- `close` : Ferme un fichier.
-- `read` : Lit des données depuis un fichier.
-- `write` : Ecrit des données dans un fichier.
-- `lseek` : Déplace le curseur de lecture/écriture dans un fichier.
-- `ftruncate` : Redimensionne un fichier.
-- `sigaction` : Modifie l'action associée à un signal.
-- `dup` : Duplique un descripteur de fichier.
-- `pipe` : Crée un tuyau anonyme.
-- `exec` : Remplace l'image mémoire du processus courant par un nouveau programme.
+> Rendez-vous dans [sock/udp](sock/udp/README.md)
+> Renvez-vous dans [sock/tcp](sock/tcp/README.md)
+> Rendez-vous dans [sock/unix](sock/unix/README.md)
 
 ## Conclusion
 
-Des mécanismes que nous avons vu, les mécanismes hérité de **System V** ne sont plus réellement utilisés (mémoire partagée, sémaphore, file de message). Les tuyaux nommés sont également peu utilisés et le système de vérrouillage de fichiers est peu performant et présente des risques de blocage.
+Vous avez maintenant une vue d'ensemble des différents mécanismes IPC. Vous avez vu :
 
-Dans l'ordre les mécanismes les plus utilisés entre processus sont :
+- les signaux,
+- la mémoire partagée,
+- les sémaphores,
+- les tubes,
+- les files de messages,
+- le vérouillage de fichiers et
+- les sockets.
 
-1. Les tuyaux anonymes (facile à mettre en place, utilisé partout)
-2. Les signaux (pour les interruptions)
-3. Les Sockets Unix. Ils sont ultra performants, sécurisés. Ils sont utilisés par Docker, MySQL, X11, Systemd, etc.
-4. Les Sockets TCP/IP pour la communication entre machines distantes.
-5. La mémoire partagée POSIX (`shm_open` et `mmap`).
-6. Les sémaphores POSIX et les fils de messages POSIX.
-
-
-
-DBus
-DBus
-DBus
+L'objectif n'est pas que vous sachiez tout sur ces mécanismes mais que vous sachiez qu'ils existent et que vous puissiez les utiliser lorsque vous en aurez besoin et que vous puissiez vous appuyer sur des exemples pour les mettre en place.

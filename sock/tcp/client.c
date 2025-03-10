@@ -3,18 +3,34 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
-#define PORT 8080
+#define PORT 3737
+#define BUFFER_SIZE 1024
+
+int sock;
+
+void handle_signal(int sig) {
+    printf("\nClosing client...\n");
+    close(sock);
+    exit(0);
+}
 
 int main() {
-    int sock = socket(AF_INET, SOCK_STREAM, 0); // TCP
+    struct sigaction sa;
+    sa.sa_handler = handle_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
         perror("socket");
         exit(1);
     }
 
     struct sockaddr_in server_address = {
-        .sin_family = AF_INET, // IPv4
+        .sin_family = AF_INET,
         .sin_port = htons(PORT)
     };
     inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr);
@@ -24,12 +40,28 @@ int main() {
         exit(1);
     }
 
-    char *message = "Hello Server!";
-    send(sock, message, strlen(message), 0);
+    printf("Connected to server on port %d. Type your messages (Ctrl+D to exit).\n", PORT);
 
-    char buffer[1024] = {0};
-    read(sock, buffer, sizeof(buffer));
-    printf("Réponse du serveur : %s\n", buffer);
+    char buffer[BUFFER_SIZE];
+    while (1) {
+        printf("> ");
+        fflush(stdout);
+
+        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+            printf("\nDisconnecting...\n");
+            break;
+        }
+
+        send(sock, buffer, strlen(buffer), 0);
+
+        memset(buffer, 0, BUFFER_SIZE);
+        int bytes_received = read(sock, buffer, sizeof(buffer));
+        if (bytes_received <= 0) {
+            printf("Server closed the connection.\n");
+            break;
+        }
+        printf("\033[1;34m%s\033[0m\n", buffer);
+    }
 
     close(sock);
 }
